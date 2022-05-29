@@ -1,135 +1,142 @@
 import random
 
-import sys
+E = '71828182845904523536'
+
+TEXT = """
+    Князь Василий исполнил обещание, данное на вечере у Анны Павловны княгине Друбецкой, просившей его о своем
+    единственном сыне Борисе. О нем было доложено государю, и, не в пример другим, он был переведен в гвардии
+    Семеновский полк прапорщиком. 
+"""
 
 class HashTable:
 
-    def __init__(self):
-        self.E = '71828182845904523536'
-        self.permutation_table = self.create_permutation_table()
-        self.table_size = 256
-        self.table = [(None, None) for _ in range(self.table_size)]
-        print(self.permutation_table)
+    def __init__(self, size):
+        self.size = size
+        self.keys = [None] * self.size
+        self.data = [None] * self.size
 
-    def create_permutation_table(self):
-        permutation_table = [[] for _ in range(20)]
+    def put(self, key, value):
+        hash_value = self.hash_function(key, self.size)
 
-        for i in range(len(permutation_table)):
-            for j in range(len(permutation_table)):
-                permutation_table[i].append(int(random.choice(self.E)))
-        return permutation_table
+        if self.keys[hash_value] is None:
+            self.keys[hash_value] = key
+            self.data[hash_value] = value
 
-    def hash(self, text, level=0):
-        j = 0
-        factor = 1
-        rehash_count = 0
-        for word in text.replace(",", "").replace(".", "").split():
-            hash_code = 0
-            for i in range(len(word)):
-                if i > len(self.permutation_table) - 1:
-                    hash_code += ord(word[i]) * self.permutation_table[level][i % len(self.permutation_table)]
-                else:
-                    hash_code += ord(word[i]) * self.permutation_table[level][i]
-            hash_code = hash_code // len(word) % self.table_size
-            if (hash_code, word) not in self.table:
-                for tuple in self.table:
-                    if hash_code == tuple[0] and word != tuple[1]:
-                        print(f"rehash: {j} {tuple}")
-                        rehash_count += 1
-                        hash_code = self.rehash(word, rehash_count)
-                if j > self.table_size - 1:
-                    factor *= 2
-                    self.buble(factor, text)
-                else:
-                    self.table[j] = (hash_code, word)
-                    j += 1
+        else:
+            if self.keys[hash_value] == key:
+                self.data[hash_value] = value
 
-        for i, tuple in enumerate(self.table):
-            if tuple[0] is not None:
-                print(i, tuple)
-        print(self.table, '\n', len(self.table), len(text.replace(",", "").replace(".", "").split()))
-        print(sys.getsizeof(self.table) / 125)
-
-    def rehash(self, word, level=0):
-        new_hash_code = 0
-        for i in range(len(word)):
-            if level > len(self.permutation_table) - 1 and i > len(self.permutation_table) - 1:
-                new_hash_code = ord(word[i]) * self.permutation_table[level % len(self.permutation_table)][
-                    i % len(self.permutation_table)]
-            elif level > len(self.permutation_table) - 1:
-                new_hash_code = ord(word[i]) * self.permutation_table[level % len(self.permutation_table)][i]
-            elif i > len(self.permutation_table) - 1:
-                new_hash_code = ord(word[i]) * self.permutation_table[level][i % len(self.permutation_table)]
             else:
-                new_hash_code = ord(word[i]) * self.permutation_table[level][i]
+                next_key = self.rehash(hash_value, self.size)
 
-        return new_hash_code // len(word) % self.table_size
+                while self.keys[next_key] is not None and self.keys[hash_value] is not key:
+                    next_key = self.rehash(next_key, len(self.keys))
 
-    def buble(self, factor, text):
-        self.table_size = 256 * factor
-        self.table = [(None, None) for _ in range(self.table_size)]
-        #print(len(self.table))
-        self.hash(text)
+                if self.keys[next_key] is None:
+                    self.keys[next_key] = key
+                    self.data[next_key] = value
+
+                else:
+                    self.data[next_key] = value
+
+    def hash_function(self, key, size):
+        return key % size
+
+    def rehash(self, old_hash, size):
+        return (old_hash + 1) % size
+
+    def get_capacity(self):
+        keys = []
+        for key in self.keys:
+            if key is not None:
+                keys.append(key)
+        return (len(keys) / self.size) * 100
+
+    def get(self, key):
+        start_pos = self.hash_function(key, self.size)
+
+        data = None
+        stop = False
+        found = False
+
+        while self.keys[start_pos] is not None and not stop and not found:
+            if self.keys[start_pos] == key:
+                found = True
+                value = self.data[start_pos]
+            else:
+                position = self.rehash(start_pos, self.size)
+                if position == start_pos:
+                    stop = True
+                else:
+                    position = self.rehash(position, self.size)
+                    if position == start_pos:
+                        stop = True
+
+        return data
+
+    def __getitem__(self, item):
+        return self.get(item)
+
+    def __setitem__(self, key, value):
+        self.put(key, value)
+
+    def __str__(self):
+        keys = []
+        values = []
+        hash_list = []
+        for key in self.keys:
+            if key is not None:
+                keys.append(key)
+        for value in self.data:
+            if value is not None:
+                values.append(value)
+        for i in range(len(keys)):
+            hash_list.append((keys[i], values[i]))
+
+        return f"{str(hash_list)}\n" \
+               f"Capacity: {((len(keys) / self.size) * 100):.2f}%"
+
+    def __repr__(self):
+        pass
+
+
+def get_permutation_table():
+    table = [[] for i in range(20)]
+
+    for i in range(20):
+        for j in range(20):
+            table[i].append(int(random.choice(E)))
+
+    return table
+
+
+def buble(old_size, permutation_table, factor=1):
+    new_size = old_size * factor
+    get_hash_of(TEXT, new_size, permutation_table)
+    print(f"Buble {old_size} -> {new_size}")
+
+
+def get_hash_of(text, size_of_hash_table, permutation_table, level_p_t=0):
+    hash_table = HashTable(size_of_hash_table)
+    sum = 0
+    factor = 1
+    for word in text.replace(",", "").replace(".", "").replace("!", "").replace("?", "").split():
+        for i in range(len(word)):
+            if len(word) < len(permutation_table) - 1:
+                sum += ord(word[i]) * permutation_table[level_p_t][i]
+            else:
+                sum += ord(word[i]) * permutation_table[level_p_t][i % len(permutation_table)]
+            sum = sum // len(word) % size_of_hash_table
+        #if hash_table[sum] != word:
+        hash_table[sum] = word
+        if hash_table.get_capacity() > 95:
+            #del hash_table
+            factor *= 2
+            buble(size_of_hash_table, permutation_table, factor)
+
+    print(hash_table)
 
 
 if __name__ == '__main__':
-    hash_table = HashTable()
-    hash_table.hash("""
-    Наступило молчание. Графиня глядела на гостью, приятно улыбаясь, впрочем, не скрывая того, что не огорчится теперь 
-    нисколько, если гостья поднимется и уедет. Дочь гостьи уже оправляла платье, вопросительно глядя на мать, как вдруг
-     из соседней комнаты послышался бег к двери нескольких мужских и женских ног, грохот зацепленного и поваленного
-      стула, и в комнату вбежала тринадцатилетняя девочка, запахнув что-то короткою кисейною юбкою, и остановилась
-       посередине комнаты. Очевидно было, она нечаянно, с нерассчитанного бега, заскочила так далеко. В дверях в ту же
-        минуту показались студент с малиновым воротником, гвардейский офицер, пятнадцатилетняя девочка и толстый
-         румяный мальчик в детской курточке.
-Граф вскочил и, раскачиваясь, широко расставил руки вокруг вбежавшей девочки.
-— А, вот она! — смеясь, закричал он. — Именинница! Ma chère именинница!
-— Ma chère, il y a un temps pour tout 1, — сказала графиня, притворяясь строгою. — Ты ее все балуешь, Elie, — прибавила
- она мужу.
-— Bonjour, ma chère, je vous félicite, — сказала гостья. — Quelle délicieuse enfant! 2 — прибавила она, 
-обращаясь к матери.
-Черноглазая, с большим ртом, некрасивая, но живая девочка, с своими детскими открытыми плечиками, выскочившими из
- корсажа от быстрого бега, с своими сбившимися назад черными кудрями, тоненькими оголенными руками и маленькими ножками
-  в кружевных панталончиках и открытых башмачках, была в том милом возрасте, когда девочка уже не ребенок, а ребенок 
-  еще не девушка. Вывернувшись от отца, она подбежала к матери и, не обращая никакого внимания на ее строгое замечание,
-   спрятала свое раскрасневшееся лицо в кружевах материной мантильи и засмеялась. Она смеялась чему-то, толкуя 
-   отрывисто про куклу, которую вынула из-под юбочки.
-— Видите?.. Кукла... Мими... Видите.
-И Наташа не могла больше говорить (ей все смешно казалось). Она упала на мать и расхохоталась так громко и звонко, что
- все, даже чопорная гостья, против воли засмеялись.
-— Ну, поди, поди с своим уродом! — сказала мать, притворно сердито отталкивая дочь. — Это моя меньшая, — обратилась 
-она к гостье.
-Наташа, оторвав на минуту лицо от кружевной косынки матери, взглянула на нее снизу сквозь слезы смеха и опять спрятала
- лицо.
-Гостья, принужденная любоваться семейною сценой, сочла нужным принять в ней какое-нибудь участие.
-— Скажите, моя милая, — сказала она, обращаясь к Наташе, — как же вам приходится эта Мими? Дочь, верно?
-Наташе не понравился тон снисхождения до детского разговора, с которым гостья обратилась к ней. Она ничего не ответила
- и серьезно посмотрела на гостью.
-Между тем все это молодое поколение: Борис — офицер, сын княгини Анны Михайловны, Николай — студент, старший сын графа,
- Соня — пятнадцатилетняя племянница графа, и маленький Петруша — меньшой сын, — все разместились в гостиной и, видимо,
-  старались удержать в границах приличия оживление и веселость, которыми еще дышала каждая их черта. Видно было,
-   что там, в задних комнатах, откуда они все так стремительно прибежали, у них были разговоры веселее, чем здесь 
-   о городских сплетнях, погоде и comtesse Apraksine 3. Изредка они взглядывали друг на друга и едва удерживались 
-   от смеха.
-Два молодых человека, студент и офицер, друзья с детства, были одних лет и оба красивы, но не похожи друг на друга.
- Борис был высокий белокурый юноша с правильными тонкими чертами спокойного и красивого лица. Николай был невысокий
-  курчавый молодой человек с открытым выражением лица. На верхней губе его уже показывались черные волосики,
-   и во всем лице выражались стремительность и восторженность. Николай покраснел, как только вошел в гостиную.
-    Видно было, что он искал и не находил, что сказать; Борис, напротив, тотчас же нашелся и рассказал спокойно,
-     шутливо, как эту Мими, куклу, он знал еще молодою девицей с не испорченным еще носом, как она в пять лет на его
-      памяти состаре́лась и как у ней по всему черепу треснула голова. Сказав это, он взглянул на Наташу. Наташа
-       отвернулась от него, взглянула на младшего брата, который, зажмурившись, трясся от беззвучного смеха, и, не
-        в силах более удерживаться, прыгнула и побежала из комнаты так скоро, как только могли нести ее быстрые ножки.
-         Борис не рассмеялся.
-— Вы, кажется, тоже хотели ехать, maman? Карета нужна? — сказал он, с улыбкой обращаясь к матери.
-— Да, поди, поди, вели приготовить, — сказала она, улыбаясь.
-Борис вышел тихо в двери и пошел за Наташей; толстый мальчик сердито побежал за ними, как будто досадуя на расстройство,
- происшедшее в его занятиях.
-Из молодежи, не считая старшей дочери графини (которая была четырьмя годами старше сестры и держала себя уже как
- большая) и гостьи-барышни, в гостиной остались Николай и Соня-племянница.
 
-    """)
-    #hash_table.hash("Тетрагидропиранилциклопентилтетрагидропиридопиридиновые,
-    # трагидропиридопиридиновыеТетрагидропиранилциклопентилте")
-
-
+    get_hash_of(TEXT, 32, get_permutation_table())
